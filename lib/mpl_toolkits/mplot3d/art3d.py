@@ -599,7 +599,7 @@ class Poly3DCollection(PolyCollection):
 
     def get_vector(self, segments3d):
         """Optimize points for projection."""
-        if isinstance(segments3d, np.ndarray):
+        if isinstance(segments3d, (np.ndarray, np.ma.MaskedArray)):
             self._segments = segments3d
         else:
             num_faces = len(segments3d)
@@ -672,15 +672,13 @@ class Poly3DCollection(PolyCollection):
         face_z = self._zsortfunc(psegments[..., 2], axis=-1).data
         face_order = np.argsort(face_z, axis=-1)[::-1]
 
-        if isinstance(self._segments, np.ma.MaskedArray):
+        if self._codes3d is not None:
             segments_2d = [s.compressed().reshape(-1, 2)
                            for s in psegments[face_order, :, :2]]
-        else:
-            segments_2d = psegments[face_order, :, :2]
-        if self._codes3d is not None:
             codes = [self._codes3d[idx] for idx in face_order]
             PolyCollection.set_verts_and_codes(self, segments_2d, codes)
         else:
+            segments_2d = psegments[face_order, :, :2]
             PolyCollection.set_verts(self, segments_2d, self._closed)
 
         self._facecolors2d = cface[face_order]
