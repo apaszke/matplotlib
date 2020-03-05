@@ -599,15 +599,15 @@ class Poly3DCollection(PolyCollection):
 
     def get_vector(self, segments3d):
         """Optimize points for projection."""
-        if len(segments3d):
-            xs, ys, zs = np.row_stack(segments3d).T
-        else:  # row_stack can't stack zero arrays.
-            xs, ys, zs = [], [], []
-        ones = np.ones(len(xs))
-        self._vec = np.array([xs, ys, zs, ones])
-
-        indices = [0, *np.cumsum([len(segment) for segment in segments3d])]
-        self._segslices = [*map(slice, indices[:-1], indices[1:])]
+        if isinstance(segments3d, np.ndarray):
+            self._segments = segments3d
+        else:
+            num_faces = len(segments3d)
+            max_verts = max((len(face) for face in segments3d), default=0)
+            padded = np.full((num_faces, max_verts, 3), np.nan)
+            for i, face in enumerate(segments3d):
+                padded[i, :len(face)] = face
+            self._segments = np.ma.masked_invalid(padded)
 
     def set_verts(self, verts, closed=True):
         """Set 3D vertices."""
@@ -649,37 +649,43 @@ class Poly3DCollection(PolyCollection):
             self.update_scalarmappable()
             self._facecolors3d = self._facecolors
 
-        txs, tys, tzs = proj3d._proj_transform_vec(self._vec, renderer.M)
-        xyzlist = [(txs[sl], tys[sl], tzs[sl]) for sl in self._segslices]
+        num_faces, num_face_vertices, _ = self._segments.shape
+        vecs = self._segments.reshape(-1, 3).T
+        _, _, pzs = pvecs = proj3d.proj_transform_vectors(vecs, renderer.M)
+        del vecs  # To avoid typos with pvecs
+        psegments = pvecs.T.reshape(self._segments.shape)
+        assert psegments.shape == (num_faces, num_face_vertices, 3)
 
         # This extra fuss is to re-order face / edge colors
         cface = self._facecolors3d
         cedge = self._edgecolors3d
-        if len(cface) != len(xyzlist):
-            cface = cface.repeat(len(xyzlist), axis=0)
-        if len(cedge) != len(xyzlist):
+        if len(cface) != num_faces:
+            cface = cface.repeat(num_faces, axis=0)
+        if len(cedge) != num_faces:
             if len(cedge) == 0:
                 cedge = cface
             else:
-                cedge = cedge.repeat(len(xyzlist), axis=0)
+                cedge = cedge.repeat(num_faces, axis=0)
 
-        # sort by depth (furthest drawn first)
-        z_segments_2d = sorted(
-            ((self._zsortfunc(zs), np.column_stack([xs, ys]), fc, ec, idx)
-             for idx, ((xs, ys, zs), fc, ec)
-             in enumerate(zip(xyzlist, cface, cedge))),
-            key=lambda x: x[0], reverse=True)
+        # NOTE: Unpacking .data is safe here, because every face has to contain
+        #       a valid vertex.
+        face_z = self._zsortfunc(psegments[..., 2], axis=-1).data
+        face_order = np.argsort(face_z, axis=-1)[::-1]
 
-        segments_2d = [s for z, s, fc, ec, idx in z_segments_2d]
+        if isinstance(self._segments, np.ma.MaskedArray):
+            segments_2d = [s.compressed().reshape(-1, 2)
+                           for s in psegments[face_order, :, :2]]
+        else:
+            segments_2d = psegments[face_order, :, :2]
         if self._codes3d is not None:
-            codes = [self._codes3d[idx] for z, s, fc, ec, idx in z_segments_2d]
+            codes = [self._codes3d[idx] for idx in face_order]
             PolyCollection.set_verts_and_codes(self, segments_2d, codes)
         else:
             PolyCollection.set_verts(self, segments_2d, self._closed)
 
-        self._facecolors2d = [fc for z, s, fc, ec, idx in z_segments_2d]
+        self._facecolors2d = cface[face_order]
         if len(self._edgecolors3d) == len(cface):
-            self._edgecolors2d = [ec for z, s, fc, ec, idx in z_segments_2d]
+            self._edgecolors2d = cedge[face_order]
         else:
             self._edgecolors2d = self._edgecolors3d
 
@@ -688,11 +694,11 @@ class Poly3DCollection(PolyCollection):
             zvec = np.array([[0], [0], [self._sort_zpos], [1]])
             ztrans = proj3d._proj_transform_vec(zvec, renderer.M)
             return ztrans[2][0]
-        elif tzs.size > 0:
+        elif pzs.size > 0:
             # FIXME: Some results still don't look quite right.
             #        In particular, examine contourf3d_demo2.py
             #        with az = -54 and elev = -45.
-            return np.min(tzs)
+            return np.min(pzs)
         else:
             return np.nan
 
