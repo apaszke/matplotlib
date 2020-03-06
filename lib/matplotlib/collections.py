@@ -1091,7 +1091,6 @@ class PolyCollection(_CollectionWithSizes):
             connection at the end.
         """
         self.stale = True
-        # This is much faster than having Path do it one at a time.
         if isinstance(verts, np.ma.MaskedArray):
             verts = verts.astype(float).filled(np.nan)
         # No need to do anything fancy if the path isn't closed.
@@ -1101,7 +1100,9 @@ class PolyCollection(_CollectionWithSizes):
 
         # Fast path for arrays
         if isinstance(verts, np.ndarray):
-            verts_pad = np.concatenate((verts, verts[:, -1:]), axis=1)
+            verts_pad = np.concatenate((verts, verts[:, 0:1]), axis=1)
+            # Creating the codes once is much faster than having Path do it
+            # separately each time by passing closed=True.
             codes = np.empty(verts_pad.shape[1], dtype=mpath.Path.code_type)
             codes[:] = mpath.Path.LINETO
             codes[0] = mpath.Path.MOVETO
@@ -1117,11 +1118,7 @@ class PolyCollection(_CollectionWithSizes):
                 else:
                     xy = np.asarray(xy)
                     xy = np.concatenate([xy, xy[0:1]])
-                codes = np.empty(xy.shape[0], dtype=mpath.Path.code_type)
-                codes[:] = mpath.Path.LINETO
-                codes[0] = mpath.Path.MOVETO
-                codes[-1] = mpath.Path.CLOSEPOLY
-                self._paths.append(mpath.Path(xy, codes))
+                self._paths.append(mpath.Path(xy, closed=True))
             else:
                 self._paths.append(mpath.Path(xy))
 
