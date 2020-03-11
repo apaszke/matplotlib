@@ -158,8 +158,10 @@ def proj_transform_vectors(vecs, M):
     is_masked = isinstance(vecs, np.ma.MaskedArray)
     if is_masked:
         mask = vecs.mask
-    vecs = np.concatenate([vecs, np.ones((1, *vecs.shape[1:]))], axis=0)
-    product = np.dot(M, vecs)
+    vecs_pad = np.empty((vecs.shape[0] + 1,) + vecs.shape[1:])
+    vecs_pad[:-1] = vecs
+    vecs_pad[-1] = 1
+    product = np.dot(M, vecs_pad)
     result = product[:3] / product[3]
     if is_masked:
         return np.ma.array(result, mask=mask)
