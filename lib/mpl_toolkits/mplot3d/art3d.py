@@ -601,7 +601,7 @@ class Poly3DCollection(PolyCollection):
         """Optimize points for projection."""
         # segments3d.shape == (num_faces, num_vertices, 3)
         if isinstance(segments3d, np.ndarray):
-            assert segments3d.dim == 3 and segments3d.shape[-1] == 3, \
+            assert segments3d.ndim == 3 and segments3d.shape[-1] == 3, \
                 "Incorrect shape of vertices of Poly3DCollection"
             self._segments = segments3d
         else:
@@ -670,9 +670,11 @@ class Poly3DCollection(PolyCollection):
             else:
                 cedge = cedge.repeat(num_faces, axis=0)
 
-        # NOTE: Unpacking .data is safe here, because every face has to contain
-        #       a valid vertex.
-        face_z = self._zsortfunc(psegments[..., 2], axis=-1).data
+        face_z = self._zsortfunc(psegments[..., 2], axis=-1)
+        if isinstance(face_z, np.ma.MaskedArray):
+            # NOTE: Unpacking .data is safe here, because every face has to contain
+            #       a valid vertex.
+            face_z = face_z.data
         face_order = np.argsort(face_z, axis=-1)[::-1]
 
         if self._codes3d is not None:
