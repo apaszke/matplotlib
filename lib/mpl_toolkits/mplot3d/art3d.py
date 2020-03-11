@@ -599,7 +599,10 @@ class Poly3DCollection(PolyCollection):
 
     def get_vector(self, segments3d):
         """Optimize points for projection."""
+        # segments3d.shape == (num_faces, num_vertices, 3)
         if isinstance(segments3d, np.ndarray):
+            assert segments3d.dim == 3 and segments3d.shape[-1] == 3, \
+                "Incorrect shape of vertices of Poly3DCollection"
             self._segments = segments3d
         else:
             num_faces = len(segments3d)
