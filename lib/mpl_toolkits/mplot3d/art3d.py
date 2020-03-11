@@ -651,7 +651,7 @@ class Poly3DCollection(PolyCollection):
 
         num_faces, num_face_vertices, _ = self._segments.shape
         vecs = self._segments.reshape(-1, 3).T
-        _, _, pzs = pvecs = proj3d.proj_transform_vectors(vecs, renderer.M)
+        _, _, pzs = pvecs = proj3d._proj_transform_vectors(vecs, renderer.M)
         del vecs  # To avoid typos with pvecs
         psegments = pvecs.T.reshape(self._segments.shape)
         assert psegments.shape == (num_faces, num_face_vertices, 3)

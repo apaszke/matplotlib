@@ -144,7 +144,7 @@ def proj_transform(xs, ys, zs, M):
 transform = proj_transform
 
 
-def proj_transform_vectors(vecs, M):
+def _proj_transform_vectors(vecs, M):
     """Vector version of ``project_transform`` able to handle MaskedArrays.
 
     Parameters
