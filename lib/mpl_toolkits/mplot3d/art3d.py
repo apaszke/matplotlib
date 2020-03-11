@@ -672,8 +672,8 @@ class Poly3DCollection(PolyCollection):
 
         face_z = self._zsortfunc(psegments[..., 2], axis=-1)
         if isinstance(face_z, np.ma.MaskedArray):
-            # NOTE: Unpacking .data is safe here, because every face has to contain
-            #       a valid vertex.
+            # NOTE: Unpacking .data is safe here, because every face has to
+            #       contain a valid vertex.
             face_z = face_z.data
         face_order = np.argsort(face_z, axis=-1)[::-1]
 
