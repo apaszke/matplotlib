@@ -10,6 +10,7 @@ line segments).
 """
 
 import math
+import gc as garbage_collector
 from numbers import Number
 import numpy as np
 
@@ -1100,14 +1101,27 @@ class PolyCollection(_CollectionWithSizes):
 
         # Fast path for arrays
         if isinstance(verts, np.ndarray):
-            verts_pad = np.concatenate((verts, verts[:, 0:1]), axis=1)
+            verts_pad = np.concatenate((verts, verts[:, 0:1]),
+                                       axis=1).astype(mpath.Path.verts_type)
             # Creating the codes once is much faster than having Path do it
             # separately each time by passing closed=True.
             codes = np.empty(verts_pad.shape[1], dtype=mpath.Path.code_type)
             codes[:] = mpath.Path.LINETO
             codes[0] = mpath.Path.MOVETO
             codes[-1] = mpath.Path.CLOSEPOLY
-            self._paths = [mpath.Path(xy, codes) for xy in verts_pad]
+            example_path = mpath.Path(verts_pad[0], codes)
+            # We're creating a lot of objects in the comprehension below, which
+            # is pretty surely going to trigger the GC multiple times. None of
+            # them will be garbage just yet, so all those runs are
+            # completely necessary.
+            garbage_collector.disable()
+            # Looking up the function once before the iteration gives a nice speedup
+            _make_path = mpath.Path._fast_from_codes_and_verts
+            self._paths = [_make_path(xy, codes,
+                                        internals_from=example_path,
+                                        unmask_verts=False)
+                            for xy in verts_pad]
+            garbage_collector.enable()
             return
 
         self._paths = []

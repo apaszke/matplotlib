@@ -74,8 +74,12 @@ class Path:
         made up front in the constructor that will not change when the
         data changes.
     """
+    __slots__ = ('_vertices', '_codes', '_readonly',
+                 '_should_simplify', '_simplify_threshold',
+                 '_interpolation_steps')
 
     code_type = np.uint8
+    verts_type = float
 
     # Path codes
     STOP = code_type(0)         # 1 vertex
@@ -160,7 +164,7 @@ class Path:
             self._readonly = False
 
     @classmethod
-    def _fast_from_codes_and_verts(cls, verts, codes, internals_from=None):
+    def _fast_from_codes_and_verts(cls, verts, codes, internals_from=None, unmask_verts=True):
         """
         Creates a Path instance without the expense of calling the constructor.
 
@@ -175,7 +179,7 @@ class Path:
             never copied, and always set to ``False`` by this constructor.
         """
         pth = cls.__new__(cls)
-        pth._vertices = _to_unmasked_float_array(verts)
+        pth._vertices = _to_unmasked_float_array(verts) if unmask_verts else verts
         pth._codes = codes
         pth._readonly = False
         if internals_from is not None:
@@ -269,15 +273,13 @@ class Path:
         """
         return self._readonly
 
-    def __copy__(self):
+    def copy(self):
         """
         Returns a shallow copy of the `Path`, which will share the
         vertices and codes with the source `Path`.
         """
         import copy
         return copy.copy(self)
-
-    copy = __copy__
 
     def __deepcopy__(self, memo=None):
         """
