@@ -1115,12 +1115,16 @@ class PolyCollection(_CollectionWithSizes):
             # them will be garbage just yet, so all those runs are
             # completely necessary.
             garbage_collector.disable()
+
+            self._paths = mpath.PathCollection(verts_pad, closed=True)
+
             # Looking up the function once before the iteration gives a nice speedup
-            _make_path = mpath.Path._fast_from_codes_and_verts
-            self._paths = [_make_path(xy, codes,
-                                        internals_from=example_path,
-                                        unmask_verts=False)
-                            for xy in verts_pad]
+            # _make_path = mpath.Path._fast_from_codes_and_verts
+            # self._paths = [_make_path(xy, codes,
+                                        # internals_from=example_path,
+                                        # unmask_verts=False)
+                            # for xy in verts_pad]
+
             garbage_collector.enable()
             return
 
